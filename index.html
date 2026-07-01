@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<!--
+  Simple Expense Tracker
+  My second project while learning to code.
+
+  The idea: I wanted something more useful than a to-do list, so I built a
+  small app to track my spending. You add an expense (what it was, how much,
+  and a category), and the app adds up your total and shows a breakdown of
+  where your money actually goes, with little bars for each category.
+
+  Still just HTML, CSS and JavaScript, no frameworks. I added lots of comments
+  so I can explain how each part works.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker</title>
+
+  <style>
+    /* ---------- Colors, kept in one place so they're easy to change ---------- */
+    :root {
+      --bg: #f4f6fb;          /* soft page background */
+      --card: #ffffff;        /* white cards */
+      --text: #1f2733;        /* main text */
+      --muted: #6b7686;       /* softer text for labels */
+      --border: #e4e8f0;      /* light borders */
+      --accent: #4f6ef2;      /* main blue */
+      --accent-soft: #eef1fe; /* pale blue for highlights */
+      --danger: #ef5b5b;      /* red for delete / over-spend */
+      --shadow: 0 4px 16px rgba(20, 30, 60, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    header {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    /* Reusable card box */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    /* ---------- The big total at the top ---------- */
+    .total-card {
+      text-align: center;
+    }
+
+    .total-card .label {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .total-card .amount {
+      font-size: 2.4rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* ---------- The form to add a new expense ---------- */
+    .form-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    .field {
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+    }
+
+    input:focus,
+    select:focus {
+      outline: 2px solid var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* put amount and category side by side */
+    .row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .row .field {
+      flex: 1;
+    }
+
+    .add-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    .add-btn:hover {
+      opacity: 0.92;
+    }
+
+    /* ---------- Category breakdown bars ---------- */
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    .breakdown-item {
+      margin-bottom: 14px;
+    }
+
+    .breakdown-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+    }
+
+    .breakdown-top .cat {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .breakdown-top .val {
+      color: var(--muted);
+    }
+
+    /* the grey track that the coloured bar sits inside */
+    .bar-track {
+      height: 9px;
+      background: var(--accent-soft);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 20px;
+      width: 0%;                 /* JavaScript sets the real width */
+      transition: width 0.4s ease;
+    }
+
+    /* ---------- Filter + expense list ---------- */
+    .list-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .filter-select {
+      width: auto;
+      padding: 7px 10px;
+      font-size: 0.9rem;
+    }
+
+    .expense {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .expense:last-child {
+      border-bottom: none;
+    }
+
+    .expense .info {
+      flex: 1;
+    }
+
+    .expense .desc {
+      font-weight: 500;
+    }
+
+    .expense .meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .expense .amount {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .expense .delete {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+
+    .expense .delete:hover {
+      color: var(--danger);
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 16px;
+      font-size: 0.95rem;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <h1>Expense Tracker</h1>
+      <p class="subtitle">Add what you spend and see where your money goes.</p>
+    </header>
+
+    <!-- The running total, filled in by JavaScript -->
+    <div class="card total-card">
+      <div class="label">Total spent</div>
+      <div class="amount" id="totalAmount">₹0</div>
+    </div>
+
+    <!-- Add-expense form -->
+    <div class="card">
+      <div class="form-title">Add an expense</div>
+
+      <div class="field">
+        <label for="desc">What was it?</label>
+        <input type="text" id="desc" placeholder="e.g. Lunch, bus ticket, books" />
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="amount">Amount (₹)</label>
+          <input type="number" id="amount" placeholder="0" min="0" />
+        </div>
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category">
+            <option value="Food">Food</option>
+            <option value="Transport">Transport</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Bills">Bills</option>
+            <option value="Fun">Fun</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="add-btn" id="addBtn">Add expense</button>
+    </div>
+
+    <!-- Category breakdown with bars -->
+    <div class="card" id="breakdownCard">
+      <div class="section-title">Where it went</div>
+      <div id="breakdown"></div>
+    </div>
+
+    <!-- List of all expenses, with a filter -->
+    <div class="card">
+      <div class="list-head">
+        <div class="section-title" style="margin-bottom: 0;">Expenses</div>
+        <select class="filter-select" id="filter">
+          <option value="All">All categories</option>
+          <option value="Food">Food</option>
+          <option value="Transport">Transport</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Bills">Bills</option>
+          <option value="Fun">Fun</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div id="expenseList"></div>
+    </div>
+
+    <footer>Built by Mouparna while learning to code 🌱</footer>
+  </div>
+
+  <script>
+    /* ============================================================
+       JAVASCRIPT
+       Read top to bottom. Each function does one small job.
+       ============================================================ */
+
+    // 1. Grab the parts of the page we need.
+    const descInput = document.getElementById("desc");
+    const amountInput = document.getElementById("amount");
+    const categoryInput = document.getElementById("category");
+    const addBtn = document.getElementById("addBtn");
+    const filterSelect = document.getElementById("filter");
+
+    const totalAmountEl = document.getElementById("totalAmount");
+    const breakdownEl = document.getElementById("breakdown");
+    const breakdownCard = document.getElementById("breakdownCard");
+    const expenseListEl = document.getElementById("expenseList");
+
+    // 2. Our data. Each expense looks like:
+    //    { id: 172..., desc: "Lunch", amount: 120, category: "Food" }
+    let expenses = [];
+
+    // 3. Save to and load from the browser so data survives a refresh.
+    function saveExpenses() {
+      localStorage.setItem("myExpenses", JSON.stringify(expenses));
+    }
+
+    function loadExpenses() {
+      const saved = localStorage.getItem("myExpenses");
+      if (saved) {
+        expenses = JSON.parse(saved);
+      }
+    }
+
+    // 4. A small helper to show money the same way everywhere.
+    //    toLocaleString adds commas, e.g. 12000 -> "12,000".
+    function formatMoney(value) {
+      return "₹" + value.toLocaleString("en-IN");
+    }
+
+    // 5. Add up every expense to get the total.
+    //    reduce walks through the list adding each amount to a running sum.
+    function getTotal() {
+      return expenses.reduce(function (sum, item) {
+        return sum + item.amount;
+      }, 0);
+    }
+
+    // 6. Group spending by category.
+    //    Returns something like { Food: 300, Transport: 90 }.
+    function getCategoryTotals() {
+      const totals = {};
+      expenses.forEach(function (item) {
+        if (totals[item.category]) {
+          totals[item.category] = totals[item.category] + item.amount;
+        } else {
+          totals[item.category] = item.amount;
+        }
+      });
+      return totals;
+    }
+
+    // 7. Draw the category breakdown bars.
+    function showBreakdown() {
+      const totals = getCategoryTotals();
+      const grandTotal = getTotal();
+
+      // If nothing is added yet, hide this whole card.
+      if (grandTotal === 0) {
+        breakdownCard.style.display = "none";
+        return;
+      }
+      breakdownCard.style.display = "block";
+
+      breakdownEl.innerHTML = "";
+
+      // Turn the totals object into a list and sort biggest first.
+      const rows = Object.keys(totals).map(function (cat) {
+        return { category: cat, amount: totals[cat] };
+      });
+      rows.sort(function (a, b) {
+        return b.amount - a.amount;
+      });
+
+      rows.forEach(function (row) {
+        // What percent of all spending is this category?
+        const percent = Math.round((row.amount / grandTotal) * 100);
+
+        const item = document.createElement("div");
+        item.className = "breakdown-item";
+        item.innerHTML =
+          '<div class="breakdown-top">' +
+            '<span class="cat">' + row.category + "</span>" +
+            '<span class="val">' + formatMoney(row.amount) + " (" + percent + "%)</span>" +
+          "</div>" +
+          '<div class="bar-track"><div class="bar-fill"></div></div>';
+
+        breakdownEl.appendChild(item);
+
+        // Set the bar width after a tiny delay so it animates in.
+        const fill = item.querySelector(".bar-fill");
+        setTimeout(function () {
+          fill.style.width = percent + "%";
+        }, 30);
+      });
+    }
+
+    // 8. Draw the list of expenses (respecting the current filter).
+    function showExpenses() {
+      expenseListEl.innerHTML = "";
+
+      const chosen = filterSelect.value; // "All" or a category
+
+      // Keep only the ones matching the filter.
+      const visible = expenses.filter(function (item) {
+        return chosen === "All" || item.category === chosen;
+      });
+
+      if (visible.length === 0) {
+        expenseListEl.innerHTML =
+          '<p class="empty">No expenses here yet. Add one above.</p>';
+        return;
+      }
+
+      // Newest first: go through the list backwards.
+      visible
+        .slice()      // make a copy so we don't reverse the real list
+        .reverse()
+        .forEach(function (item) {
+          const row = document.createElement("div");
+          row.className = "expense";
+          row.innerHTML =
+            '<div class="info">' +
+              '<div class="desc">' + item.desc + "</div>" +
+              '<div class="meta">' + item.category + "</div>" +
+            "</div>" +
+            '<div class="amount">' + formatMoney(item.amount) + "</div>";
+
+          // delete button
+          const del = document.createElement("button");
+          del.className = "delete";
+          del.textContent = "×";
+          del.onclick = function () {
+            deleteExpense(item.id);
+          };
+          row.appendChild(del);
+
+          expenseListEl.appendChild(row);
+        });
+    }
+
+    // 9. Refresh everything on screen at once.
+    function refresh() {
+      totalAmountEl.textContent = formatMoney(getTotal());
+      showBreakdown();
+      showExpenses();
+    }
+
+    // 10. Add a new expense from the form.
+    function addExpense() {
+      const desc = descInput.value.trim();
+      const amount = Number(amountInput.value);
+
+      // Basic checks so we don't add empty or silly values.
+      if (desc === "") {
+        alert("Please type what the expense was.");
+        return;
+      }
+      if (!amount || amount <= 0) {
+        alert("Please enter an amount greater than 0.");
+        return;
+      }
+
+      expenses.push({
+        id: Date.now(),            // a simple unique id (the current time)
+        desc: desc,
+        amount: amount,
+        category: categoryInput.value
+      });
+
+      // Clear the form for the next entry.
+      descInput.value = "";
+      amountInput.value = "";
+      descInput.focus();
+
+      saveExpenses();
+      refresh();
+    }
+
+    // 11. Remove one expense by its id.
+    function deleteExpense(id) {
+      expenses = expenses.filter(function (item) {
+        return item.id !== id;
+      });
+      saveExpenses();
+      refresh();
+    }
+
+    // 12. Connect the buttons and inputs.
+    addBtn.onclick = addExpense;
+    filterSelect.onchange = showExpenses; // re-draw the list when filter changes
+
+    // Let Enter in the amount box add the expense too.
+    amountInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        addExpense();
+      }
+    });
+
+    // 13. Start the app.
+    loadExpenses();
+    refresh();
+  </script>
+</body>
+</html>
